@@ -4,7 +4,7 @@ import re
 import shlex
 
 from . import patterns
-from .fakefs import FakeFS, SHADOW_DENIED
+from .fakefs import SHADOW_DENIED, FakeFS
 
 URL_RE = re.compile(r"(?:https?|ftp|tftp)://[^\s'\"<>|;&]+", re.I)
 OPERATORS = {";", "&&", "||", "&", "|"}
@@ -82,7 +82,7 @@ class Shell:
 
     @staticmethod
     def _segments(tokens):
-        seg = []
+        seg: list[str] = []
         for tok in tokens:
             if tok in (";", "&&", "||", "&"):
                 if seg:
@@ -94,7 +94,8 @@ class Shell:
             yield seg
 
     def _run_pipeline(self, tokens, depth):
-        parts, cur = [], []
+        parts: list = []
+        cur: list = []
         for tok in tokens:
             if tok == "|":
                 parts.append(cur)

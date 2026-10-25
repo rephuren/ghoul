@@ -6,7 +6,7 @@ from . import dashboard, demo, report, server
 from .store import Store
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(prog="ghoul", description="SSH honeypot с поддельной оболочкой")
     sub = parser.add_subparsers(dest="mode", required=True)
 
@@ -17,6 +17,10 @@ def main():
     run.add_argument("--key", default="data/host_key")
     run.add_argument("--hostname", default="srv04")
     run.add_argument("--accept-after", type=int, default=2, help="сколько паролей отклонить перед входом")
+    run.add_argument("--max-connections", type=int, default=100, help="одновременных соединений всего")
+    run.add_argument("--max-per-ip", type=int, default=5, help="одновременных соединений с одного адреса")
+    run.add_argument("--max-sessions", type=int, default=50000, help="сколько сессий хранить в базе")
+    run.add_argument("--max-age-days", type=int, default=30, help="сколько дней хранить сессии")
 
     rep = sub.add_parser("report", help="отчёт по собранным данным")
     rep.add_argument("--db", default="data/ghoul.db")
@@ -30,7 +34,7 @@ def main():
     seed = sub.add_parser("seed-demo", help="заполнить базу синтетическими данными для демо")
     seed.add_argument("--db", default="data/demo.db")
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if args.mode == "dashboard":
         dashboard.serve(args.host, args.port, args.db)
         return
@@ -44,7 +48,10 @@ def main():
         return
 
     async def serve():
-        srv, store = await server.start(args.host, args.port, args.db, args.key, args.hostname, args.accept_after)
+        srv, store = await server.start(
+            args.host, args.port, args.db, args.key, args.hostname, args.accept_after,
+            args.max_connections, args.max_per_ip, args.max_sessions, args.max_age_days,
+        )
         print(f"ghoul слушает {args.host}:{args.port}, база {args.db}")
         try:
             await srv.wait_closed()
@@ -57,4 +64,5 @@ def main():
         pass
 
 
-main()
+if __name__ == "__main__":
+    main()

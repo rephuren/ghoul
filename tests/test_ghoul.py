@@ -134,7 +134,10 @@ def test_dashboard_api_on_demo_data(tmp_path):
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), dashboard.make_handler(db))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{httpd.server_address[1]}"
-    get = lambda path: urllib.request.urlopen(base + path).read()
+
+    def get(path):
+        return urllib.request.urlopen(base + path).read()
+
     try:
         assert b"GHOUL" in get("/")
         summary = json.loads(get("/api/summary"))
@@ -146,7 +149,7 @@ def test_dashboard_api_on_demo_data(tmp_path):
         assert isinstance(json.loads(get(f"/api/session/{sid}")), list)
         try:
             get("/api/top?kind=bogus")
-            assert False, "ожидали 404"
+            raise AssertionError("ожидали 404")
         except urllib.error.HTTPError as e:
             assert e.code == 404
     finally:

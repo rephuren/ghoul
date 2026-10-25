@@ -53,7 +53,7 @@ def seed(db_path, sessions=420, hours=48, seed_value=13):
         sid = cur.lastrowid
         t = started
 
-        def ev(kind, data):
+        def ev(kind, data, sid=sid):
             nonlocal t
             t += rng.random() * 2 + 0.2
             db.execute(

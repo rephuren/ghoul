@@ -15,7 +15,10 @@ TOP_LIMIT = 12
 
 def summary(store):
     db = store.db
-    one = lambda sql: db.execute(sql).fetchone()[0]
+
+    def one(sql):
+        return db.execute(sql).fetchone()[0]
+
     return {
         "sessions": one("SELECT COUNT(*) FROM sessions"),
         "authed": one("SELECT COUNT(*) FROM sessions WHERE authed = 1"),
@@ -105,7 +108,7 @@ def classify(commands):
 
 
 def attacks(store):
-    per_session = {}
+    per_session: dict[int, list[str]] = {}
     for sid, _, d in store.events("command"):
         per_session.setdefault(sid, []).append(d["cmd"])
     revshell = {sid for sid, _, _ in store.events("revshell")}
