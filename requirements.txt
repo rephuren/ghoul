@@ -1,0 +1,2 @@
+asyncssh>=2.14
+pytest

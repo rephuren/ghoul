@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ghoul</title>
+<style>
+  :root {
+    --bg: #050505; --panel: #0a0a0a; --line: #1a1a1a; --text: #e8e8e8; --dim: #8a8a8a;
+    --faint: #4a4a4a; --red: #b3000f; --red-hi: #e0102a;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body {
+    margin: 0; color: var(--text); background: var(--bg);
+    font: 13px/1.5 "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    min-height: 100vh; position: relative;
+  }
+  body::before { /* сканлайны */
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 50;
+    background: repeating-linear-gradient(to bottom, rgba(255,255,255,.035) 0 1px, transparent 1px 4px);
+  }
+  body::after { /* виньетка */
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 49;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.85) 100%);
+  }
+  main { max-width: 1240px; margin: 0 auto; padding: 28px 20px 60px; position: relative; z-index: 1; }
+
+  header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 26px; }
+  h1 {
+    margin: 0; font-size: 46px; letter-spacing: .32em; font-weight: 700; position: relative;
+    color: var(--text); text-transform: uppercase;
+  }
+  h1::before, h1::after { content: attr(data-t); position: absolute; left: 0; top: 0; pointer-events: none; }
+  h1::before { color: var(--red); animation: glitch-a 4.5s infinite steps(1); opacity: 0; }
+  h1::after  { color: var(--faint); animation: glitch-b 4.5s infinite steps(1); opacity: 0; }
+  @keyframes glitch-a { 0%,93%,100% { opacity:0; transform:none } 94% { opacity:.9; transform:translate(6px,-2px) } 96% { opacity:.9; transform:translate(-5px,1px) } 98% { opacity:.6; transform:translate(2px,0) } }
+  @keyframes glitch-b { 0%,94%,100% { opacity:0; transform:none } 95% { opacity:.8; transform:translate(-7px,1px) } 97% { opacity:.6; transform:translate(4px,-1px) } }
+  .status { color: var(--dim); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+  .status b { color: var(--red); font-weight: 400; animation: pulse 1.6s infinite; }
+  @keyframes pulse { 50% { opacity: .2 } }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 12px; }
+  .card, .panel { background: var(--panel); border: 1px solid var(--line); padding: 14px 16px; }
+  .card .k { color: var(--dim); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; }
+  .card .v { font-size: 34px; font-weight: 700; letter-spacing: .04em; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .card.hot .v { color: var(--red-hi); }
+
+  .panel h2 {
+    margin: 0 0 12px; font-size: 11px; font-weight: 400; color: var(--dim);
+    letter-spacing: .22em; text-transform: uppercase;
+  }
+  .panel h2::before { content: "▓ "; color: var(--red); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 12px; margin-top: 12px; }
+  .wide { margin-top: 12px; }
+
+  .rows { display: grid; gap: 4px; }
+  .row { position: relative; display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 3px 8px; overflow: hidden; }
+  .row .bar { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(179,0,15,.18); border-right: 1px solid var(--red); z-index: 0; }
+  .row .name { position: relative; z-index: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .n { position: relative; z-index: 1; color: var(--dim); font-variant-numeric: tabular-nums; }
+  .empty { color: var(--faint); padding: 3px 8px; }
+
+  svg.chart { width: 100%; height: 150px; display: block; }
+  .chart .b-all { fill: #2b2b2b; }
+  .chart .b-in { fill: var(--red); }
+  .chart text { fill: var(--faint); font: 10px "SF Mono", Menlo, monospace; }
+  .chart line { stroke: var(--line); }
+  .legend { display: flex; gap: 18px; color: var(--dim); font-size: 11px; margin-top: 6px; }
+  .legend i { display: inline-block; width: 9px; height: 9px; margin-right: 6px; background: #2b2b2b; }
+  .legend i.r { background: var(--red); }
+
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; color: var(--dim); font-weight: 400; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; padding: 4px 8px; border-bottom: 1px solid var(--line); }
+  td { padding: 5px 8px; border-bottom: 1px solid #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+  tr.s { cursor: pointer; }
+  tr.s:hover td { background: #101010; color: #fff; }
+  .tag { color: var(--red-hi); }
+  .ok { color: var(--text); } .no { color: var(--faint); }
+
+  #drawer {
+    position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100vw); background: #070707;
+    border-left: 1px solid var(--red); z-index: 60; transform: translateX(105%); transition: transform .18s;
+    padding: 18px 18px 40px; overflow: auto;
+  }
+  #drawer.open { transform: none; }
+  #drawer h3 { margin: 0 0 4px; font-size: 14px; letter-spacing: .2em; text-transform: uppercase; }
+  #drawer .meta { color: var(--dim); margin-bottom: 14px; }
+  #drawer button { position: absolute; right: 14px; top: 12px; background: none; color: var(--dim); border: 1px solid var(--line); padding: 2px 10px; font: inherit; cursor: pointer; }
+  #drawer button:hover { color: var(--text); border-color: var(--red); }
+  .ev { display: grid; grid-template-columns: 52px 76px 1fr; gap: 8px; padding: 3px 0; border-bottom: 1px solid #101010; }
+  .ev .t { color: var(--faint); } .ev .kind { color: var(--dim); text-transform: uppercase; font-size: 11px; letter-spacing: .1em; }
+  .ev.command .kind, .ev.url .kind, .ev.download .kind, .ev.pipe_to_shell .kind, .ev.exec .kind { color: var(--red-hi); }
+  .ev .d { word-break: break-all; }
+
+  footer { margin-top: 34px; color: var(--faint); font-size: 11px; text-align: center; letter-spacing: .1em; white-space: pre; overflow: hidden; }
+  @media (max-width: 520px) { h1 { font-size: 30px; } .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1 data-t="GHOUL">GHOUL</h1>
+    <div class="status"><b>●</b> слушаю · <span id="last">—</span></div>
+  </header>
+
+  <section class="cards">
+    <div class="card"><div class="k">сессий</div><div class="v" id="c-sessions">0</div></div>
+    <div class="card hot"><div class="k">вошли</div><div class="v" id="c-authed">0</div></div>
+    <div class="card"><div class="k">уникальных ip</div><div class="v" id="c-ips">0</div></div>
+    <div class="card"><div class="k">команд</div><div class="v" id="c-commands">0</div></div>
+    <div class="card hot"><div class="k">url (ioc)</div><div class="v" id="c-urls">0</div></div>
+  </section>
+
+  <section class="panel wide">
+    <h2>активность, 48 часов</h2>
+    <svg class="chart" id="timeline" viewBox="0 0 1200 150" preserveAspectRatio="none"></svg>
+    <div class="legend"><span><i></i>все сессии</span><span><i class="r"></i>с входом</span></div>
+  </section>
+
+  <section class="grid">
+    <div class="panel"><h2>логин:пароль</h2><div class="rows" id="t-creds"></div></div>
+    <div class="panel"><h2>команды</h2><div class="rows" id="t-cmds"></div></div>
+    <div class="panel"><h2>url из команд</h2><div class="rows" id="t-urls"></div></div>
+    <div class="panel"><h2>ip-адреса</h2><div class="rows" id="t-ips"></div></div>
+    <div class="panel"><h2>логины</h2><div class="rows" id="t-users"></div></div>
+    <div class="panel"><h2>ssh-клиенты</h2><div class="rows" id="t-clients"></div></div>
+  </section>
+
+  <section class="panel wide">
+    <h2>последние сессии</h2>
+    <table>
+      <thead><tr><th>#</th><th>когда</th><th>ip</th><th>логин</th><th>клиент</th><th>команд</th><th>длит.</th></tr></thead>
+      <tbody id="sessions"></tbody>
+    </table>
+  </section>
+
+  <footer>░▒▓█  не прячусь, просто не в кадре  █▓▒░</footer>
+</main>
+
+<aside id="drawer">
+  <button id="close">закрыть</button>
+  <h3 id="d-title"></h3>
+  <div class="meta" id="d-meta"></div>
+  <div id="d-events"></div>
+</aside>
+
+<script>
+  // Все данные приходят от атакующих. Только textContent, никакого innerHTML.
+  const $ = (id) => document.getElementById(id);
+  const el = (tag, cls, text) => {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  };
+  const getJSON = (url) => fetch(url, { cache: "no-store" }).then((r) => r.json());
+  const pad = (n) => String(n).padStart(2, "0");
+  const fmtTime = (ts) => { const d = new Date(ts * 1000); return `${pad(d.getDate())}.${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
+  const ago = (s) => s < 60 ? `${Math.floor(s)}с назад` : s < 3600 ? `${Math.floor(s / 60)}м назад` : s < 86400 ? `${Math.floor(s / 3600)}ч назад` : `${Math.floor(s / 86400)}д назад`;
+
+  function renderTop(id, rows) {
+    const box = $(id);
+    box.replaceChildren();
+    if (!rows.length) { box.append(el("div", "empty", "пусто")); return; }
+    const max = rows[0][1];
+    for (const [name, n] of rows) {
+      const row = el("div", "row");
+      const bar = el("div", "bar");
+      bar.style.width = (n / max * 100) + "%";
+      const label = el("div", "name", name);
+      label.title = name;
+      row.append(bar, label, el("div", "n", n));
+      box.append(row);
+    }
+  }
+
+  function renderTimeline(buckets) {
+    const svg = $("timeline");
+    svg.replaceChildren();
+    const W = 1200, H = 150, padB = 18, padT = 8;
+    const max = Math.max(1, ...buckets.map((b) => b.n));
+    const bw = W / buckets.length;
+    const NS = "http://www.w3.org/2000/svg";
+    const mk = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+    for (let i = 1; i <= 3; i++) {
+      const y = padT + (H - padB - padT) * (1 - i / 3);
+      svg.append(mk("line", { x1: 0, x2: W, y1: y, y2: y }));
+    }
+    buckets.forEach((b, i) => {
+      const h = (H - padB - padT) * b.n / max;
+      const hi = (H - padB - padT) * b.authed / max;
+      const x = i * bw + 2;
+      svg.append(mk("rect", { class: "b-all", x, width: bw - 4, y: H - padB - h, height: h }));
+      if (b.authed) svg.append(mk("rect", { class: "b-in", x, width: bw - 4, y: H - padB - hi, height: hi }));
+      if (i % 6 === 0) {
+        const t = mk("text", { x: x, y: H - 4 });
+        t.textContent = pad(new Date(b.t * 1000).getHours()) + ":00";
+        svg.append(t);
+      }
+    });
+  }
+
+  function renderSessions(list) {
+    const body = $("sessions");
+    body.replaceChildren();
+    if (!list.length) {
+      const tr = el("tr"); const td = el("td", "empty", "сессий пока нет"); td.colSpan = 7; tr.append(td); body.append(tr); return;
+    }
+    for (const s of list) {
+      const tr = el("tr", "s");
+      const dur = s.ended ? Math.round(s.ended - s.started) + "с" : "…";
+      tr.append(
+        el("td", "", s.id), el("td", "", fmtTime(s.started)), el("td", "", s.src_ip),
+        el("td", s.authed ? "tag" : "no", s.authed ? (s.username || "?") : "отказ"),
+        el("td", "", (s.client_version || "").replace("SSH-2.0-", "")),
+        el("td", s.cmds ? "ok" : "no", s.cmds), el("td", "no", dur),
+      );
+      tr.addEventListener("click", () => openSession(s));
+      body.append(tr);
+    }
+  }
+
+  async function openSession(s) {
+    $("d-title").textContent = "сессия #" + s.id;
+    $("d-meta").textContent = `${s.src_ip} · ${fmtTime(s.started)} · ${s.client_version || "?"}`;
+    const box = $("d-events");
+    box.replaceChildren();
+    const events = await getJSON("/api/session/" + s.id);
+    for (const e of events) {
+      const row = el("div", "ev " + e.kind);
+      const d = e.data;
+      const text = e.kind === "auth" ? `${d.username}:${d.password} ${d.ok ? "→ вход" : "→ отказ"}`
+        : e.kind === "command" ? d.cmd
+        : e.kind === "url" || e.kind === "download" ? d.url
+        : JSON.stringify(d);
+      row.append(el("div", "t", "+" + Math.round(e.ts - s.started) + "с"), el("div", "kind", e.kind), el("div", "d", text));
+      box.append(row);
+    }
+    if (!events.length) box.append(el("div", "empty", "событий нет"));
+    $("drawer").classList.add("open");
+  }
+  $("close").addEventListener("click", () => $("drawer").classList.remove("open"));
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("drawer").classList.remove("open"); });
+
+  async function refresh() {
+    try {
+      const [sum, tl, ses, ...tops] = await Promise.all([
+        getJSON("/api/summary"), getJSON("/api/timeline"), getJSON("/api/sessions"),
+        ...["creds", "cmds", "urls", "ips", "users", "clients"].map((k) => getJSON("/api/top?kind=" + k)),
+      ]);
+      for (const k of ["sessions", "authed", "ips", "commands", "urls"]) $("c-" + k).textContent = sum[k];
+      $("last").textContent = sum.last ? "последняя: " + ago(sum.now - sum.last) : "ждём первых гостей";
+      renderTimeline(tl);
+      renderSessions(ses);
+      ["creds", "cmds", "urls", "ips", "users", "clients"].forEach((k, i) => renderTop("t-" + k, tops[i]));
+    } catch (err) {
+      $("last").textContent = "нет связи";
+    }
+  }
+  refresh();
+  setInterval(refresh, 5000);
+</script>
+</body>
+</html>
