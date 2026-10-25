@@ -82,6 +82,56 @@ def session_events(store, session_id):
     return [{"ts": r["ts"], "kind": r["kind"], "data": json.loads(r["data"])} for r in rows]
 
 
+ATTACK_RULES = [
+    ("загрузчик ботнета", ("wget http", "curl -s http", "curl http", "| sh", "tftp", "ftpget")),
+    ("захват аккаунта", ("chpasswd", "passwd")),
+    ("кража ssh-ключей", (".ssh", "authorized_keys")),
+    ("разведка системы", ("uname", "whoami", "cat /etc/passwd", "cpuinfo", "free", "nproc", "ifconfig", "id", "uptime", "df", "ls", "ps", "w")),
+]
+
+
+def classify(commands):
+    """Тип атаки по набору команд сессии: первое правило, под которое что-то подошло."""
+    joined = " ; ".join(commands)
+    for label, needles in ATTACK_RULES[:-1]:
+        if any(n in joined for n in needles):
+            return label
+    first = [c.split()[0] for c in commands if c.split()]
+    if any(c in ("uname", "whoami", "id", "cat", "free", "nproc", "ifconfig", "uptime", "df", "ls", "ps", "w") for c in first):
+        return ATTACK_RULES[-1][0]
+    return "прочее"
+
+
+def attacks(store):
+    per_session = {}
+    for sid, _, d in store.events("command"):
+        per_session.setdefault(sid, []).append(d["cmd"])
+    counter = Counter(classify(cmds) for cmds in per_session.values())
+    silent = store.db.execute("SELECT COUNT(*) FROM sessions WHERE authed = 1").fetchone()[0] - len(per_session)
+    if silent > 0:
+        counter["вошёл и молчит"] += silent
+    return [[k, v] for k, v in counter.most_common()]
+
+
+def feed(store, limit=12):
+    rows = store.db.execute(
+        "SELECT e.ts, e.kind, e.data, s.src_ip FROM events e JOIN sessions s ON s.id = e.session_id "
+        "WHERE e.kind IN ('auth', 'command', 'url') ORDER BY e.id DESC LIMIT ?",
+        (limit,),
+    ).fetchall()
+    out = []
+    for r in rows:
+        d = json.loads(r["data"])
+        if r["kind"] == "auth":
+            text = f"{d['username']}:{d['password']} -> " + ("вход" if d["ok"] else "отказ")
+        elif r["kind"] == "command":
+            text = d["cmd"]
+        else:
+            text = d["url"]
+        out.append({"ts": r["ts"], "ip": r["src_ip"], "kind": r["kind"], "text": text})
+    return out
+
+
 def route(store, path, query):
     if path == "/api/summary":
         return summary(store)
@@ -89,6 +139,10 @@ def route(store, path, query):
         return top(store, query.get("kind", [""])[0])
     if path == "/api/timeline":
         return timeline(store)
+    if path == "/api/attacks":
+        return attacks(store)
+    if path == "/api/feed":
+        return feed(store)
     if path == "/api/sessions":
         return sessions(store)
     if path.startswith("/api/session/"):

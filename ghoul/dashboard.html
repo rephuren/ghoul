@@ -93,6 +93,16 @@
   .ev.command .kind, .ev.url .kind, .ev.download .kind, .ev.pipe_to_shell .kind, .ev.exec .kind { color: var(--red-hi); }
   .ev .d { word-break: break-all; }
 
+  .feed { font-size: 12px; height: 214px; overflow: hidden; display: flex; flex-direction: column; gap: 2px; }
+  .fl { display: grid; grid-template-columns: 62px 118px 1fr; gap: 10px; white-space: nowrap; animation: in .4s; }
+  .fl .t { color: var(--faint); } .fl .ip { color: var(--dim); }
+  .fl .x { overflow: hidden; text-overflow: ellipsis; }
+  .fl.command .x::before { content: "$ "; color: var(--red); }
+  .fl.url .x { color: var(--red-hi); } .fl.url .x::before { content: "⇣ "; }
+  .fl.auth .x { color: var(--dim); }
+  @keyframes in { from { opacity: 0; transform: translateX(-6px) } to { opacity: 1; transform: none } }
+  .lead { color: var(--dim); max-width: 760px; margin: -12px 0 24px; }
+
   footer { margin-top: 34px; color: var(--faint); font-size: 11px; text-align: center; letter-spacing: .1em; white-space: pre; overflow: hidden; }
   @media (max-width: 520px) { h1 { font-size: 30px; } .grid { grid-template-columns: 1fr; } }
 </style>
@@ -103,6 +113,8 @@
     <h1 data-t="GHOUL">GHOUL</h1>
     <div class="status"><b>●</b> слушаю · <span id="last">—</span></div>
   </header>
+
+  <p class="lead">Ловушка, которая притворяется чужим сервером. Боты со всего интернета ломятся внутрь, а здесь видно, кто они и чего хотят.</p>
 
   <section class="cards">
     <div class="card"><div class="k">сессий</div><div class="v" id="c-sessions">0</div></div>
@@ -116,6 +128,11 @@
     <h2>активность, 48 часов</h2>
     <svg class="chart" id="timeline" viewBox="0 0 1200 150" preserveAspectRatio="none"></svg>
     <div class="legend"><span><i></i>все сессии</span><span><i class="r"></i>с входом</span></div>
+  </section>
+
+  <section class="grid">
+    <div class="panel"><h2>что делают боты</h2><div class="rows" id="t-attacks"></div></div>
+    <div class="panel"><h2>живая лента</h2><div class="feed" id="feed"></div></div>
   </section>
 
   <section class="grid">
@@ -243,16 +260,30 @@
   $("close").addEventListener("click", () => $("drawer").classList.remove("open"));
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("drawer").classList.remove("open"); });
 
+  function renderFeed(items) {
+    const box = $("feed");
+    box.replaceChildren();
+    if (!items.length) { box.append(el("div", "empty", "ждём первых гостей")); return; }
+    for (const it of items) {
+      const row = el("div", "fl " + it.kind);
+      row.append(el("span", "t", fmtTime(it.ts).slice(6)), el("span", "ip", it.ip), el("span", "x", it.text));
+      box.append(row);
+    }
+  }
+
   async function refresh() {
     try {
-      const [sum, tl, ses, ...tops] = await Promise.all([
+      const [sum, tl, ses, att, feed, ...tops] = await Promise.all([
         getJSON("/api/summary"), getJSON("/api/timeline"), getJSON("/api/sessions"),
+        getJSON("/api/attacks"), getJSON("/api/feed"),
         ...["creds", "cmds", "urls", "ips", "users", "clients"].map((k) => getJSON("/api/top?kind=" + k)),
       ]);
       for (const k of ["sessions", "authed", "ips", "commands", "urls"]) $("c-" + k).textContent = sum[k];
       $("last").textContent = sum.last ? "последняя: " + ago(sum.now - sum.last) : "ждём первых гостей";
       renderTimeline(tl);
       renderSessions(ses);
+      renderTop("t-attacks", att);
+      renderFeed(feed);
       ["creds", "cmds", "urls", "ips", "users", "clients"].forEach((k, i) => renderTop("t-" + k, tops[i]));
     } catch (err) {
       $("last").textContent = "нет связи";

@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" width="1200" height="320">
+  <defs>
+    <pattern id="scan" width="4" height="4" patternUnits="userSpaceOnUse">
+      <rect width="4" height="1" fill="#fff" opacity="0.045"/>
+    </pattern>
+    <radialGradient id="vig" cx="50%" cy="50%" r="75%">
+      <stop offset="55%" stop-color="#000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="0.9"/>
+    </radialGradient>
+    <style>
+      text { font-family: 'Courier New', monospace; }
+      .ghost { animation: jitter 3.2s infinite steps(1); }
+      .red   { animation: jitterR 3.2s infinite steps(1); }
+      .blink { animation: blink 1.1s infinite steps(1); }
+      .noise { animation: noise 0.9s infinite steps(1); }
+      @keyframes jitter  { 0%,92%,100%{transform:translate(0,0)} 93%{transform:translate(-6px,2px)} 95%{transform:translate(5px,-1px)} 97%{transform:translate(-2px,0)} }
+      @keyframes jitterR { 0%,92%,100%{transform:translate(0,0);opacity:0} 93%{transform:translate(7px,-2px);opacity:.9} 95%{transform:translate(-6px,1px);opacity:.9} 97%{transform:translate(3px,0);opacity:.6} }
+      @keyframes blink   { 0%,49%{opacity:1} 50%,100%{opacity:0} }
+      @keyframes noise   { 0%{transform:translateY(0)} 25%{transform:translateY(-3px)} 50%{transform:translateY(2px)} 75%{transform:translateY(-1px)} }
+    </style>
+  </defs>
+
+  <rect width="1200" height="320" fill="#050505"/>
+
+  <g class="noise" fill="#d9d9d9" opacity="0.5" font-size="11">
+    <text x="30"  y="40">¦░▒▓█ 0x7F454C46 ░▒▓ ÷╪╫ ░▒</text>
+    <text x="860" y="52">Ñ¤ÞÞ ▓▒░ 0xDEADC0DE ░░▒▓█</text>
+    <text x="40"  y="296">&gt; ssh root@target -p 2222</text>
+    <text x="840" y="290">0x4748554C</text>
+  </g>
+
+  <g class="red">
+    <text x="600" y="172" text-anchor="middle" font-size="96" font-weight="700" fill="#b3000f" letter-spacing="26">GHOUL</text>
+  </g>
+  <g class="ghost">
+    <text x="600" y="172" text-anchor="middle" font-size="96" font-weight="700" fill="#e8e8e8" letter-spacing="26">GHOUL</text>
+  </g>
+
+  <text x="600" y="214" text-anchor="middle" font-size="15" fill="#8a8a8a" letter-spacing="9">SSH HONEYPOT  ·  FAKE SHELL  ·  LIVE DASHBOARD</text>
+  <text x="600" y="246" text-anchor="middle" font-size="15" fill="#b3000f">&gt; _<tspan class="blink">█</tspan></text>
+
+  <rect width="1200" height="320" fill="url(#scan)"/>
+  <rect width="1200" height="320" fill="url(#vig)"/>
+</svg>

