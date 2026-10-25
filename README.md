@@ -21,8 +21,8 @@
 - **приёмы повышения привилегий** в духе GTFOBins: `sudo -l`, поиск SUID, `find -exec`, linpeas
 
 <div align="center">
-<img src="assets/dashboard.png" alt="дашборд ghoul" width="100%"/>
-<sub>дашборд на синтетических данных (команда <code>seed-demo</code>), IP из документационных диапазонов. Полная страница: <a href="assets/dashboard-full.png">dashboard-full.png</a></sub>
+<img src="assets/dashboard.gif" alt="дашборд ghoul наполняется событиями" width="100%"/>
+<sub>дашборд на синтетических данных (команда <code>seed-demo</code>), IP из документационных диапазонов. Анимация собрана из кадров демо-базы. Статичный кадр: <a href="assets/dashboard.png">dashboard.png</a>, полная страница: <a href="assets/dashboard-full.png">dashboard-full.png</a></sub>
 </div>
 
 ## Быстрый старт
