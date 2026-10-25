@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "misxnthropy" }]
-dependencies = ["asyncssh>=2.14"]
+dependencies = ["asyncssh>=2.24.1"]
 
 [project.optional-dependencies]
 dev = ["pytest", "ruff", "mypy"]

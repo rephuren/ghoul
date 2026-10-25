@@ -1,2 +1,2 @@
-asyncssh>=2.14
+asyncssh>=2.24.1
 pytest
