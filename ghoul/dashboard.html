@@ -100,6 +100,7 @@
   .fl.command .x::before { content: "$ "; color: var(--red); }
   .fl.url .x { color: var(--red-hi); } .fl.url .x::before { content: "⇣ "; }
   .fl.auth .x { color: var(--dim); }
+  .fl.revshell .x, .fl.privesc .x { color: var(--red-hi); font-weight: 700; } .fl.revshell .x::before { content: "⚠ "; } .fl.privesc .x::before { content: "↑ "; }
   @keyframes in { from { opacity: 0; transform: translateX(-6px) } to { opacity: 1; transform: none } }
   .lead { color: var(--dim); max-width: 760px; margin: -12px 0 24px; }
 
@@ -121,6 +122,7 @@
     <div class="card hot"><div class="k">вошли</div><div class="v" id="c-authed">0</div></div>
     <div class="card"><div class="k">уникальных ip</div><div class="v" id="c-ips">0</div></div>
     <div class="card"><div class="k">команд</div><div class="v" id="c-commands">0</div></div>
+    <div class="card hot"><div class="k">реверс-шеллы</div><div class="v" id="c-revshells">0</div></div>
     <div class="card hot"><div class="k">url (ioc)</div><div class="v" id="c-urls">0</div></div>
   </section>
 
@@ -278,7 +280,7 @@
         getJSON("/api/attacks"), getJSON("/api/feed"),
         ...["creds", "cmds", "urls", "ips", "users", "clients"].map((k) => getJSON("/api/top?kind=" + k)),
       ]);
-      for (const k of ["sessions", "authed", "ips", "commands", "urls"]) $("c-" + k).textContent = sum[k];
+      for (const k of ["sessions", "authed", "ips", "commands", "revshells", "urls"]) $("c-" + k).textContent = sum[k];
       $("last").textContent = sum.last ? "последняя: " + ago(sum.now - sum.last) : "ждём первых гостей";
       renderTimeline(tl);
       renderSessions(ses);

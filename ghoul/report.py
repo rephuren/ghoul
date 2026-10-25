@@ -30,6 +30,8 @@ def build(store, color=True):
     top_ips = db.execute(
         "SELECT src_ip, COUNT(*) c FROM sessions GROUP BY src_ip ORDER BY c DESC LIMIT 10"
     ).fetchall()
+    revshells = Counter(f"{d['target']}  ({d['technique']})" for _, _, d in store.events("revshell"))
+    privesc = Counter(d["technique"] for _, _, d in store.events("privesc"))
     clients = Counter(
         row["client_version"] for row in db.execute("SELECT client_version FROM sessions") if row["client_version"]
     )
@@ -43,6 +45,8 @@ def build(store, color=True):
     lines += _section("IP-адреса", [(r["src_ip"], r["c"]) for r in top_ips])
     lines += _section("команды", cmds.most_common())
     lines += _section("URL из команд (IOC)", urls.most_common())
+    lines += _section("реверс-шеллы (цель)", revshells.most_common())
+    lines += _section("повышение привилегий", privesc.most_common())
     lines += _section("SSH-клиенты", clients.most_common())
     text = "\n".join(lines) + "\n"
     if not color:

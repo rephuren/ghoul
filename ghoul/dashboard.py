@@ -21,6 +21,7 @@ def summary(store):
         "authed": one("SELECT COUNT(*) FROM sessions WHERE authed = 1"),
         "ips": one("SELECT COUNT(DISTINCT src_ip) FROM sessions"),
         "commands": one("SELECT COUNT(*) FROM events WHERE kind = 'command'"),
+        "revshells": one("SELECT COUNT(*) FROM events WHERE kind = 'revshell'"),
         "urls": one("SELECT COUNT(DISTINCT json_extract(data, '$.url')) FROM events WHERE kind = 'url'"),
         "last": db.execute("SELECT MAX(started) FROM sessions").fetchone()[0],
         "now": time.time(),
@@ -83,6 +84,7 @@ def session_events(store, session_id):
 
 
 ATTACK_RULES = [
+    ("майнер", ("xmr", "minerd", "xmrig", "stratum+tcp")),
     ("загрузчик ботнета", ("wget http", "curl -s http", "curl http", "| sh", "tftp", "ftpget")),
     ("захват аккаунта", ("chpasswd", "passwd")),
     ("кража ssh-ключей", (".ssh", "authorized_keys")),
@@ -106,7 +108,17 @@ def attacks(store):
     per_session = {}
     for sid, _, d in store.events("command"):
         per_session.setdefault(sid, []).append(d["cmd"])
-    counter = Counter(classify(cmds) for cmds in per_session.values())
+    revshell = {sid for sid, _, _ in store.events("revshell")}
+    privesc = {sid for sid, _, _ in store.events("privesc")}
+
+    def label(sid, cmds):
+        if sid in revshell:
+            return "реверс-шелл"
+        if sid in privesc:
+            return "повышение привилегий"
+        return classify(cmds)
+
+    counter = Counter(label(sid, cmds) for sid, cmds in per_session.items())
     silent = store.db.execute("SELECT COUNT(*) FROM sessions WHERE authed = 1").fetchone()[0] - len(per_session)
     if silent > 0:
         counter["вошёл и молчит"] += silent
@@ -116,7 +128,7 @@ def attacks(store):
 def feed(store, limit=12):
     rows = store.db.execute(
         "SELECT e.ts, e.kind, e.data, s.src_ip FROM events e JOIN sessions s ON s.id = e.session_id "
-        "WHERE e.kind IN ('auth', 'command', 'url') ORDER BY e.id DESC LIMIT ?",
+        "WHERE e.kind IN ('auth', 'command', 'url', 'revshell', 'privesc') ORDER BY e.id DESC LIMIT ?",
         (limit,),
     ).fetchall()
     out = []
@@ -126,6 +138,10 @@ def feed(store, limit=12):
             text = f"{d['username']}:{d['password']} -> " + ("вход" if d["ok"] else "отказ")
         elif r["kind"] == "command":
             text = d["cmd"]
+        elif r["kind"] == "revshell":
+            text = f"реверс-шелл → {d['target']} ({d['technique']})"
+        elif r["kind"] == "privesc":
+            text = f"повышение привилегий: {d['technique']}"
         else:
             text = d["url"]
         out.append({"ts": r["ts"], "ip": r["src_ip"], "kind": r["kind"], "text": text})

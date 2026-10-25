@@ -3,6 +3,7 @@
 import re
 import shlex
 
+from . import patterns
 from .fakefs import FakeFS, SHADOW_DENIED
 
 URL_RE = re.compile(r"(?:https?|ftp|tftp)://[^\s'\"<>|;&]+", re.I)
@@ -63,6 +64,8 @@ class Shell:
             self.on_event("command", {"cmd": line})
             for url in URL_RE.findall(line):
                 self.on_event("url", {"url": url, "cmd": line})
+            for kind, data in patterns.detect(line):
+                self.on_event(kind, data)
         try:
             lexer = shlex.shlex(line, posix=True, punctuation_chars=";&|<>")
             lexer.whitespace_split = True
@@ -123,6 +126,8 @@ class Shell:
         if not args:
             return ""
         if args[0] == "sudo" and len(args) > 1:
+            if args[1] == "-l":
+                return "User root may run the following commands on " + self.hostname + ":\n    (ALL : ALL) ALL\n"
             args = args[1:]
         name, rest = args[0], args[1:]
         handler = getattr(self, "cmd_" + re.sub(r"\W", "_", name.split("/")[-1]), None)
@@ -311,6 +316,14 @@ class Shell:
     cmd_killall = cmd_chmod
 
     def cmd_false(self, args, depth):
+        return ""
+
+    def cmd_find(self, args, depth):
+        if "-perm" in args:
+            return "/usr/bin/passwd\n/usr/bin/sudo\n/usr/bin/su\n/usr/bin/mount\n"
+        return ""
+
+    def cmd_getcap(self, args, depth):
         return ""
 
     def cmd_passwd(self, args, depth):
