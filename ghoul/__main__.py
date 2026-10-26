@@ -2,7 +2,7 @@ import argparse
 import asyncio
 import sys
 
-from . import dashboard, demo, report, server
+from . import dashboard, demo, export, report, server
 from .store import Store
 
 
@@ -31,12 +31,35 @@ def main(argv=None):
     dash.add_argument("--port", type=int, default=8080)
     dash.add_argument("--db", default="data/ghoul.db")
 
+    exp = sub.add_parser("export", help="выгрузить события в JSON или CSV")
+    exp.add_argument("--db", default="data/ghoul.db")
+    exp.add_argument("--format", choices=["json", "csv"], default="json")
+    exp.add_argument("--since", help="только за последние 30m, 12h, 7d, 2w")
+    exp.add_argument("--kind", help="типы событий через запятую: auth, command, url, revshell и т. д.")
+    exp.add_argument("--out", help="файл вместо стандартного вывода")
+
     seed = sub.add_parser("seed-demo", help="заполнить базу синтетическими данными для демо")
     seed.add_argument("--db", default="data/demo.db")
 
     args = parser.parse_args(argv)
     if args.mode == "dashboard":
         dashboard.serve(args.host, args.port, args.db)
+        return
+    if args.mode == "export":
+        try:
+            since = export.parse_since(args.since) if args.since else None
+        except ValueError as e:
+            parser.error(str(e))
+        kinds = [k.strip() for k in (args.kind or "").split(",") if k.strip()]
+        store = Store(args.db)
+        items = export.rows(store, since, kinds)
+        writer = export.write_csv if args.format == "csv" else export.write_json
+        if args.out:
+            with open(args.out, "w", encoding="utf-8", newline="") as fh:
+                writer(items, fh)
+            print(f"выгрузка записана в {args.out}", file=sys.stderr)
+        else:
+            writer(items, sys.stdout)
         return
     if args.mode == "seed-demo":
         demo.seed(args.db)
