@@ -69,14 +69,46 @@ def timeline(store, hours=48):
     return buckets
 
 
-def sessions(store, limit=40):
-    rows = store.db.execute(
+MAX_LIMIT = 200
+
+
+def clamp(value, low, high, default):
+    """Число из строки запроса, зажатое в [low, high]; мусор даёт значение по умолчанию."""
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(low, min(high, n))
+
+
+def like_escape(text):
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def sessions(store, limit=40, offset=0, ip=None, attack=None):
+    limit = clamp(limit, 1, MAX_LIMIT, 40)
+    offset = clamp(offset, 0, 10**9, 0)
+    where, args = [], []
+    if ip:
+        where.append("s.src_ip LIKE ? ESCAPE '\\'")
+        args.append(like_escape(ip.strip()) + "%")
+    labels = session_labels(store)
+    if attack:
+        ids = [sid for sid, label in labels.items() if label == attack]
+        if not ids:
+            return []
+        where.append("s.id IN (" + ",".join("?" * len(ids)) + ")")
+        args.extend(ids)
+    sql = (
         "SELECT s.id, s.started, s.ended, s.src_ip, s.client_version, s.username, s.authed, "
         "(SELECT COUNT(*) FROM events e WHERE e.session_id = s.id AND e.kind = 'command') AS cmds "
-        "FROM sessions s ORDER BY s.id DESC LIMIT ?",
-        (limit,),
-    ).fetchall()
-    return [dict(r) for r in rows]
+        "FROM sessions s" + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY s.id DESC LIMIT ? OFFSET ?"
+    )
+    rows = store.db.execute(sql, (*args, limit, offset)).fetchall()
+    out = [dict(r) for r in rows]
+    for row in out:
+        row["attack"] = labels.get(row["id"])
+    return out
 
 
 def session_events(store, session_id):
@@ -107,21 +139,27 @@ def classify(commands):
     return "прочее"
 
 
-def attacks(store):
+def session_labels(store):
+    """Тип атаки для каждой сессии, где были команды, реверс-шелл или повышение привилегий."""
     per_session: dict[int, list[str]] = {}
     for sid, _, d in store.events("command"):
         per_session.setdefault(sid, []).append(d["cmd"])
     revshell = {sid for sid, _, _ in store.events("revshell")}
     privesc = {sid for sid, _, _ in store.events("privesc")}
-
-    def label(sid, cmds):
+    labels = {}
+    for sid in per_session.keys() | revshell | privesc:
         if sid in revshell:
-            return "реверс-шелл"
-        if sid in privesc:
-            return "повышение привилегий"
-        return classify(cmds)
+            labels[sid] = "реверс-шелл"
+        elif sid in privesc:
+            labels[sid] = "повышение привилегий"
+        else:
+            labels[sid] = classify(per_session[sid])
+    return labels
 
-    counter = Counter(label(sid, cmds) for sid, cmds in per_session.items())
+
+def attacks(store):
+    per_session = {sid for sid, _, _ in store.events("command")}
+    counter = Counter(session_labels(store).values())
     silent = store.db.execute("SELECT COUNT(*) FROM sessions WHERE authed = 1").fetchone()[0] - len(per_session)
     if silent > 0:
         counter["вошёл и молчит"] += silent
@@ -163,7 +201,8 @@ def route(store, path, query):
     if path == "/api/feed":
         return feed(store)
     if path == "/api/sessions":
-        return sessions(store)
+        q = lambda k: query.get(k, [None])[0]  # noqa: E731
+        return sessions(store, q("limit"), q("offset"), q("ip"), q("attack"))
     if path.startswith("/api/session/"):
         tail = path.rsplit("/", 1)[-1]
         return session_events(store, int(tail)) if tail.isdigit() else None
