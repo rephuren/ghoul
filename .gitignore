@@ -6,3 +6,4 @@ __pycache__/
 dist/
 .mypy_cache/
 .ruff_cache/
+.DS_Store
