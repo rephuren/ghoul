@@ -166,6 +166,32 @@ def attacks(store):
     return [[k, v] for k, v in counter.most_common()]
 
 
+GROUPS_LIMIT = 20
+GROUP_SHOWN_CMDS = 3
+
+
+def groups(store, limit=GROUPS_LIMIT, min_repeats=2):
+    """Повторяющиеся боты: сессии с одним IP, клиентом и набором команд. Считается на лету, в базу ничего не пишется."""
+    limit = clamp(limit, 1, 100, GROUPS_LIMIT)
+    cmds: dict[int, list[str]] = {}
+    for sid, _, d in store.events("command"):
+        cmds.setdefault(sid, []).append(d["cmd"])
+    found: dict[tuple, dict] = {}
+    for sid, started, ip, client in store.db.execute(
+        "SELECT id, started, src_ip, client_version FROM sessions WHERE authed = 1"
+    ):
+        key = (ip, client, tuple(cmds.get(sid, ())))
+        g = found.get(key)
+        if g is None:
+            found[key] = {"ip": ip, "client": client, "cmds": list(key[2]), "n": 1, "first": started, "last": started}
+        else:
+            g["n"] += 1
+            g["first"] = min(g["first"], started)
+            g["last"] = max(g["last"], started)
+    top_groups = sorted((g for g in found.values() if g["n"] >= min_repeats), key=lambda g: (-g["n"], -g["last"]))
+    return top_groups[:limit]
+
+
 def feed(store, limit=12):
     rows = store.db.execute(
         "SELECT e.ts, e.kind, e.data, s.src_ip FROM events e JOIN sessions s ON s.id = e.session_id "
@@ -198,6 +224,8 @@ def route(store, path, query):
         return timeline(store)
     if path == "/api/attacks":
         return attacks(store)
+    if path == "/api/groups":
+        return groups(store, query.get("limit", [None])[0])
     if path == "/api/feed":
         return feed(store)
     if path == "/api/sessions":

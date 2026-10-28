@@ -137,6 +137,10 @@
     <div class="panel"><h2>живая лента</h2><div class="feed" id="feed"></div></div>
   </section>
 
+  <section class="panel wide">
+    <h2>повторяющиеся боты</h2><div class="rows" id="t-groups"></div>
+  </section>
+
   <section class="grid">
     <div class="panel"><h2>логин:пароль</h2><div class="rows" id="t-creds"></div></div>
     <div class="panel"><h2>команды</h2><div class="rows" id="t-cmds"></div></div>
@@ -275,9 +279,9 @@
 
   async function refresh() {
     try {
-      const [sum, tl, ses, att, feed, ...tops] = await Promise.all([
+      const [sum, tl, ses, att, feed, grp, ...tops] = await Promise.all([
         getJSON("/api/summary"), getJSON("/api/timeline"), getJSON("/api/sessions"),
-        getJSON("/api/attacks"), getJSON("/api/feed"),
+        getJSON("/api/attacks"), getJSON("/api/feed"), getJSON("/api/groups"),
         ...["creds", "cmds", "urls", "ips", "users", "clients"].map((k) => getJSON("/api/top?kind=" + k)),
       ]);
       for (const k of ["sessions", "authed", "ips", "commands", "revshells", "urls"]) $("c-" + k).textContent = sum[k];
@@ -286,6 +290,10 @@
       renderSessions(ses);
       renderTop("t-attacks", att);
       renderFeed(feed);
+      renderTop("t-groups", grp.map((g) => [
+        g.ip + " · " + (g.client || "клиент неизвестен") + " · " + (g.cmds.slice(0, 3).join("; ") || "без команд") + (g.cmds.length > 3 ? " …" : ""),
+        g.n,
+      ]));
       ["creds", "cmds", "urls", "ips", "users", "clients"].forEach((k, i) => renderTop("t-" + k, tops[i]));
     } catch (err) {
       $("last").textContent = "нет связи";
