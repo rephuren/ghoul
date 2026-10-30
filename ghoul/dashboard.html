@@ -102,6 +102,11 @@
   .fl.auth .x { color: var(--dim); }
   .fl.revshell .x, .fl.privesc .x { color: var(--red-hi); font-weight: 700; } .fl.revshell .x::before { content: "⚠ "; } .fl.privesc .x::before { content: "↑ "; }
   @keyframes in { from { opacity: 0; transform: translateX(-6px) } to { opacity: 1; transform: none } }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 12px; }
+  .bar input, .bar select, .bar button { background: var(--panel); color: inherit; border: 1px solid var(--line); padding: 5px 10px; font: inherit; }
+  .bar input:focus, .bar select:focus, .bar button:hover:not(:disabled) { border-color: var(--red); outline: none; }
+  .bar button:disabled { color: var(--faint); cursor: default; }
+  .bar .page { color: var(--dim); margin-left: auto; }
   .lead { color: var(--dim); max-width: 760px; margin: -12px 0 24px; }
 
   footer { margin-top: 34px; color: var(--faint); font-size: 11px; text-align: center; letter-spacing: .1em; white-space: pre; overflow: hidden; }
@@ -151,7 +156,18 @@
   </section>
 
   <section class="panel wide">
-    <h2>последние сессии</h2>
+    <h2>сессии</h2>
+    <div class="bar">
+      <input id="f-ip" type="search" placeholder="ip, например 203.0.113." maxlength="45" autocomplete="off" aria-label="поиск по началу ip">
+      <select id="f-attack" aria-label="тип атаки">
+        <option value="">любой тип атаки</option>
+        <option>майнер</option><option>загрузчик ботнета</option><option>захват аккаунта</option><option>кража ssh-ключей</option>
+        <option>разведка системы</option><option>реверс-шелл</option><option>повышение привилегий</option><option>прочее</option>
+      </select>
+      <button id="p-prev" type="button">← назад</button>
+      <button id="p-next" type="button">дальше →</button>
+      <span class="page" id="p-info">стр. 1</span>
+    </div>
     <table>
       <thead><tr><th>#</th><th>когда</th><th>ip</th><th>логин</th><th>клиент</th><th>команд</th><th>длит.</th></tr></thead>
       <tbody id="sessions"></tbody>
@@ -178,6 +194,18 @@
     return e;
   };
   const getJSON = (url) => fetch(url, { cache: "no-store" }).then((r) => r.json());
+
+  // Фильтры и страница списка сессий. Живут в переменных, поэтому обновление раз в 5 секунд их не сбрасывает.
+  const PAGE = 40;
+  const view = { page: 0, hasNext: false };
+  function sessionsUrl() {
+    const q = new URLSearchParams({ limit: PAGE + 1, offset: view.page * PAGE });
+    const ip = $("f-ip").value.trim();
+    const attack = $("f-attack").value;
+    if (ip) q.set("ip", ip);
+    if (attack) q.set("attack", attack);
+    return "/api/sessions?" + q.toString();
+  }
   const pad = (n) => String(n).padStart(2, "0");
   const fmtTime = (ts) => { const d = new Date(ts * 1000); return `${pad(d.getDate())}.${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
   const ago = (s) => s < 60 ? `${Math.floor(s)}с назад` : s < 3600 ? `${Math.floor(s / 60)}м назад` : s < 86400 ? `${Math.floor(s / 3600)}ч назад` : `${Math.floor(s / 86400)}д назад`;
@@ -228,7 +256,7 @@
     const body = $("sessions");
     body.replaceChildren();
     if (!list.length) {
-      const tr = el("tr"); const td = el("td", "empty", "сессий пока нет"); td.colSpan = 7; tr.append(td); body.append(tr); return;
+      const tr = el("tr"); const td = el("td", "empty", "сессий по этим условиям нет"); td.colSpan = 7; tr.append(td); body.append(tr); return;
     }
     for (const s of list) {
       const tr = el("tr", "s");
@@ -280,14 +308,18 @@
   async function refresh() {
     try {
       const [sum, tl, ses, att, feed, grp, ...tops] = await Promise.all([
-        getJSON("/api/summary"), getJSON("/api/timeline"), getJSON("/api/sessions"),
+        getJSON("/api/summary"), getJSON("/api/timeline"), getJSON(sessionsUrl()),
         getJSON("/api/attacks"), getJSON("/api/feed"), getJSON("/api/groups"),
         ...["creds", "cmds", "urls", "ips", "users", "clients"].map((k) => getJSON("/api/top?kind=" + k)),
       ]);
       for (const k of ["sessions", "authed", "ips", "commands", "revshells", "urls"]) $("c-" + k).textContent = sum[k];
       $("last").textContent = sum.last ? "последняя: " + ago(sum.now - sum.last) : "ждём первых гостей";
       renderTimeline(tl);
-      renderSessions(ses);
+      view.hasNext = ses.length > PAGE;
+      renderSessions(ses.slice(0, PAGE));
+      $("p-prev").disabled = view.page === 0;
+      $("p-next").disabled = !view.hasNext;
+      $("p-info").textContent = "стр. " + (view.page + 1);
       renderTop("t-attacks", att);
       renderFeed(feed);
       renderTop("t-groups", grp.map((g) => [
@@ -299,6 +331,12 @@
       $("last").textContent = "нет связи";
     }
   }
+  let typing;
+  const reload = () => { view.page = 0; refresh(); };
+  $("f-ip").addEventListener("input", () => { clearTimeout(typing); typing = setTimeout(reload, 300); });
+  $("f-attack").addEventListener("change", reload);
+  $("p-prev").addEventListener("click", () => { if (view.page > 0) { view.page--; refresh(); } });
+  $("p-next").addEventListener("click", () => { if (view.hasNext) { view.page++; refresh(); } });
   refresh();
   setInterval(refresh, 5000);
 </script>
